@@ -1,0 +1,4 @@
+//Create spec file
+python -m PyInstaller --onefile --paths ../venv/Lib/site-packages --distpath dist --workpath build MainApplication.py
+//Use spec file
+python -m PyInstaller MainApplication.spec

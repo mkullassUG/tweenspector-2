@@ -1,5 +1,7 @@
 __pycache__/
 .coverage
 htmlcov/
+build/
+dist/
 tweenspector/images/file.png
 Thumbs.db
