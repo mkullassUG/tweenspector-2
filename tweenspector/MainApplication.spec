@@ -10,31 +10,31 @@ a = Analysis(
     binaries=[],
     datas=[
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pl_core_news_lg",
+            "../venv/Lib/site-packages/pl_core_news_lg",
             "pl_core_news_lg"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pl_core_news_lg-3.3.0.dist-info",
+            "../venv/Lib/site-packages/pl_core_news_lg-3.3.0.dist-info",
             "pl_core_news_lg-3.3.0.dist-info"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pycairo-1.21.0.dist-info",
+            "../venv/Lib/site-packages/pycairo-1.21.0.dist-info",
             "pycairo-1.21.0.dist-info"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pycares-4.2.2.dist-info",
+            "../venv/Lib/site-packages/pycares-4.2.2.dist-info",
             "pycares-4.2.2.dist-info"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pycparser",
+            "../venv/Lib/site-packages/pycparser",
             "pycparser"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\pycparser-2.21.dist-info",
+            "../venv/Lib/site-packages/pycparser-2.21.dist-info",
             "pycparser-2.21.dist-info"
         ),
         (
-            "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\cairo",
+            "../venv/Lib/site-packages/cairo",
             "cairo"
         )
     ],
@@ -61,13 +61,13 @@ a = Analysis(
 )
 a.datas += [
     (
-        "wordcloud\\stopwords",
-        "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\wordcloud\\stopwords",
+        "wordcloud/stopwords",
+        "../venv/Lib/site-packages/wordcloud/stopwords",
         "DATA"
     ),
     (
-        "wordcloud\\DroidSansMono.ttf",
-        "C:\\Users\\Admin\\Uniwersytet_s2\\sem1\\ProjZesp\\local\\tweenspector\\venv\\Lib\\site-packages\\wordcloud\\DroidSansMono.ttf",
+        "wordcloud/DroidSansMono.ttf",
+        "../venv/Lib/site-packages/wordcloud/DroidSansMono.ttf",
         "DATA"
     )
 ]
