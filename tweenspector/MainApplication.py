@@ -14,7 +14,6 @@ from App_variables import *
 from FeatureStrategy import UserWordConnection, RelatedPeopleConnection, AccountsInfo
 from TweetsData import TweetsData, save_tweets_df_to_csv
 from sys import platform
-import os
 
 
 def remove_widgets(*item_list):
@@ -33,7 +32,7 @@ class MainApplication:
         self.parent.configure(background=bg)
         self.parent.geometry('700x750')
         self.parent.title('TweeNspector')
-        if platform == "win32" and os.path.exists('images/app_icon.ico'):
+        if platform == "win32":
             self.parent.wm_iconbitmap('images/app_icon.ico')
         self.parent.resizable(True, True)
 
