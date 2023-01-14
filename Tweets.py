@@ -45,13 +45,13 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
                     # gdyby lematyzer był wyłączony to w tekście wszystkie słowa
                     words = tweets.tweet.values
             return words
-        except ValueError:  # obsługa wyjątków
+        except ValueError as exc:  # obsługa wyjątków
             print("Generate word cloud - Blad wartosci")
-            return None
+            raise exc
         except Exception as exc:
             print("Generate word cloud - Cos poszlo nie tak: {excType} {excMsg}"
                   .format(excType=type(exc).__name__, excMsg=str(exc)))
-            return None
+            raise exc
 
 
 def get_tweets(user_name, search_words, date_from, date_to, num_of_tweets):  # wczytanie tweetów

@@ -5,6 +5,7 @@ from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row, Spacer
 from bokeh.models import Select, DatePicker, TextInput, Button, TableColumn, DataTable
 from bokeh.models.callbacks import CustomJS
+from bokeh.models.ui import Dialog
 
 import numpy as np
 import networkx as nx
@@ -33,8 +34,11 @@ class Dashboard:
                  active_window_size=7,
                  ):
         # global variables which can be controlled by interactive bokeh elements
+        self.plot_container = None
+        self.error_dialog_container = None
         self.active_window_size = active_window_size
         self.layout = None
+        self.empty_element = None
 
         tweet_num_options = [str(n) for n in range(100, 3100, 100)]
         functionalities = [
@@ -53,13 +57,20 @@ class Dashboard:
         self.export_button = Button(label="Zapisz do CSV", button_type="default", width=150)
         self.export_button.on_event('button_click', self.save_to_csv)
         self.export_button.disabled = True  # TODO remove once save_to_csv() is implemented
-        self.p = None
-        self.q = None
-        self.r = None
-        self.s = None
         self.columns = None
 
+    def hide_display(self):
+        self.plot_container.children[0] = self.empty_element
+
+    def show_display(self, content):
+        self.plot_container.children[0] = content
+
+    def show_error_message(self, message, title="Error"):
+        error_dialog = Dialog(title=title, content=message)
+        self.error_dialog_container.children[0] = error_dialog
+
     def refresh(self):
+        self.hide_display()
         funct = self.functionality.value
         try:
             if funct == "wordcloud":
@@ -72,64 +83,34 @@ class Dashboard:
                 tweets = Tweets(user_name, search_words, date_from, date_to, tweets_count)
                 words = tweets.get_wordcloud_words()
                 if words is None:
-                    # TODO display alert
-                    pass
+                    self.show_error_message("Brak tweetów do wyświetlenia dla podanych parametrów")
                 else:
                     # TODO display word cloud
                     print(f"{len(words)} words to display")
+                    p, _, _, _ = self.generate_test_figures()
+                    self.show_display(p)
+                    print("Wordcloud displayed")
             elif funct == "interconnections_network":
                 # TODO implement
-                pass
+                _, q, _, _ = self.generate_test_figures()
+                self.show_display(q)
+                print("Interconnections network displayed")
             elif funct == "user_stats":
                 # TODO implement
-                pass
+                _, _, r, _ = self.generate_test_figures()
+                self.show_display(r)
+                print("User stats displayed")
             else:
                 raise ValueError("Należy wybrać funkcjonalność")
         except Exception as e:
-            # TODO display alert with error message
+            self.show_error_message(str(e))
             raise e
-
-    # source = ColumnDataSource(self.get_tweets())
-    # self.s = DataTable(source=source, columns=self.columns, width=500, height=280, editable=False)
-    # self.layout.children[0].children[0] = column(self.p, self.q)
-    # self.layout.children[0].children[1] = column(self.r, self.s)
-    # self.layout.children[0].children[2] = column(self.username, self.search_word, self.date_from,
-    #                                              self.date_until, self.num_of_tweets,
-    #                                              row(self.refresh_button, self.export_button))
 
     def save_to_csv(self):
         # TODO implement
         pass
 
-    def get_tweets(self):  # wczytanie tweetów
-        try:  # w przeciwnym razie konfigurujemy Twinta
-            c = twint.Config()
-            c.Username = self.username.value
-            c.Limit = self.num_of_tweets.value
-            c.Pandas = True
-            c.Retweets = True
-            c.Pandas_clean = True
-            c.Stats = True
-            c.Count = True
-            c.Since = self.date_from.value
-            c.Until = self.date_until.value
-            c.Search = self.search_word.value
-            c.Hide_output = True
-            twint.run.Profile(c)
-            if twint.output.panda.Tweets_df.empty:  # jeśli nie znaleziono tweetów to informujemy o tym
-                print("No tweets from user: ", self.username.value)
-                return twint.output.panda.Tweets_df
-            else:  # zwracamy pustą lub pełną ramke danych
-                return twint.output.panda.Tweets_df
-        except ValueError:  # obsługujemy potencjalne wyjątki
-            print("Get tweets - Blad wartosci, user:", self.username.value)
-            return pd.DataFrame()
-        except Exception as exc:
-            print("Get tweets - Cos poszlo nie tak, user: {user}, wyjatek: {excType} {excMsg}"
-                  .format(user=self.username.value, excType=type(exc).__name__, excMsg=str(exc)))
-            return pd.DataFrame()
-
-    def generate_figures(self):
+    def generate_test_figures(self):
         x = np.linspace(0, 4 * np.pi, 100)
         y = np.sin(x)
         p = figure(title="Legend Example")
@@ -137,6 +118,7 @@ class Dashboard:
         p.circle(x, 2 * y, legend_label="2*sin(x)", color="orange")
         p.circle(x, 3 * y, legend_label="3*sin(x)", color="green")
         p.legend.title = 'Markers'
+
         G = nx.karate_club_graph()
 
         SAME_CLUB_COLOR, DIFFERENT_CLUB_COLOR = "darkgrey", "red"
@@ -202,19 +184,14 @@ class Dashboard:
         them in rows and columns
         :return: None
         """
-        # wordcloud_g = None
-        # interconnections_g = None
-        # statistics_g = None
-        # tweet_l = None
-        #
-        # self.p, self.q, self.r, self.s = self.generate_figures()
-        # self.layout = layout(children=[
-        #     row(column(self.p, self.q),
-        #         column(self.r, self.s),
-        #         column(self.username, self.search_word, self.date_from, self.date_until, self.num_of_tweets,
-        #                row(self.refresh_button, self.export_button)
-        #                ))
-        # ])
+
+        self.empty_element = Spacer(width=0, height=0)
+        self.plot_container = column(self.empty_element)
+
+        dummy_dialog = Dialog(title="Error", content="An error occurred")
+        dummy_dialog.visible = False
+        self.error_dialog_container = column(dummy_dialog)
+
         self.layout = layout(children=[
             row(Spacer(sizing_mode="stretch_both"),
                 column(
@@ -223,9 +200,16 @@ class Dashboard:
                            self.functionality, row(self.refresh_button, self.export_button)),
                     Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
+                column(
+                    Spacer(width=1, sizing_mode="stretch_height"),
+                    self.plot_container,
+                    Spacer(width=1, sizing_mode="stretch_height"),
+                    sizing_mode="stretch_height"),
+                self.error_dialog_container,
                 Spacer(sizing_mode="stretch_both"),
                 sizing_mode="stretch_both")
         ], sizing_mode="stretch_both")
+
         curdoc().add_root(self.layout)
         curdoc().title = "Tweenspector"
 
