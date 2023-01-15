@@ -1,9 +1,11 @@
 import datetime
+import math
 from datetime import date
 
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row, Spacer
-from bokeh.models import Select, DatePicker, TextInput, Button, TableColumn, DataTable
+from bokeh.models import Select, DatePicker, TextInput, Button, TableColumn, DataTable, CrosshairTool, HoverTool, \
+    SaveTool, RadioGroup
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.ui import Dialog
 
@@ -20,7 +22,7 @@ from numpy.random import randint
 import pandas as pd
 import nest_asyncio
 
-from Tweets import Tweets
+from Tweets import Tweets, UserStatsOptions
 
 nest_asyncio.apply()
 
@@ -34,11 +36,11 @@ class Dashboard:
                  active_window_size=7,
                  ):
         # global variables which can be controlled by interactive bokeh elements
-        self.plot_container = None
+        self.display_container = None
         self.error_dialog_container = None
+        self.functionality_options_container = None
         self.active_window_size = active_window_size
         self.layout = None
-        self.empty_element = None
 
         tweet_num_options = [str(n) for n in range(100, 3100, 100)]
         functionalities = [
@@ -46,12 +48,35 @@ class Dashboard:
             ("interconnections_network", "Powiązane konta"),
             ("user_stats", "Statystyki użytkownika")]
 
+        self.inter_net_options = [
+            ("Optimal modularity", None),
+            ("Springlass", None),
+            ("Label propagation", None)
+        ]
+        self.user_stats_options = [
+            ("Reakcje na tweety", UserStatsOptions.REACTIONS),
+            ("Godzina publikacji", UserStatsOptions.TWEETS_PER_HOUR),
+            ("Hasztagi", UserStatsOptions.HASHTAGS)
+        ]
+
+        self.inter_net_option_widgets = RadioGroup(labels=[t[0] for t in self.inter_net_options], active=0)
+        self.user_stats_option_widgets = RadioGroup(labels=[t[0] for t in self.user_stats_options], active=0)
+
+        def update_functionality_options(attr, old, new):
+            self.functionality_options_container.children[0] = self.get_functionality_options()
+
         self.username = TextInput(title="Nazwa użytkownika")
         self.search_word = TextInput(title="Poszukiwane słowo")
         self.date_from = DatePicker(title="Data początkowa", value=date.today() - datetime.timedelta(days=30))
         self.date_until = DatePicker(title="Data końcowa", value=date.today())
         self.num_of_tweets = Select(title="Liczba tweetow", value='100', options=tweet_num_options)
         self.functionality = Select(title="Funkcjonalność", value="wordcloud", options=functionalities)
+        self.functionality_options = {
+            "wordcloud": None,
+            "interconnections_network": self.inter_net_option_widgets,
+            "user_stats": self.user_stats_option_widgets
+        }
+        self.functionality.on_change("value", update_functionality_options)
         self.refresh_button = Button(label="Załaduj tweety", button_type="default", width=150)
         self.refresh_button.on_event('button_click', self.refresh)
         self.export_button = Button(label="Zapisz do CSV", button_type="default", width=150)
@@ -60,27 +85,30 @@ class Dashboard:
         self.columns = None
 
     def hide_display(self):
-        self.plot_container.children[0] = self.empty_element
+        self.display_container.children[0] = get_empty_element()
 
     def show_display(self, content):
-        self.plot_container.children[0] = content
+        self.display_container.children[0] = content
 
     def show_error_message(self, message, title="Error"):
         error_dialog = Dialog(title=title, content=message)
         self.error_dialog_container.children[0] = error_dialog
 
+    def get_functionality_options(self):
+        funct_opt = self.functionality_options.get(self.functionality.value)
+        return funct_opt if funct_opt is not None else get_empty_element()
+
     def refresh(self):
         self.hide_display()
         funct = self.functionality.value
         try:
+            user_name = self.username.value
+            search_words = self.search_word.value
+            date_from = self.date_from.value
+            date_to = self.date_until.value
+            tweets_count = self.num_of_tweets.value
+            tweets = Tweets(user_name, search_words, date_from, date_to, tweets_count)
             if funct == "wordcloud":
-                user_name = self.username.value
-                search_words = self.search_word.value
-                date_from = self.date_from.value
-                date_to = self.date_until.value
-                tweets_count = self.num_of_tweets.value
-
-                tweets = Tweets(user_name, search_words, date_from, date_to, tweets_count)
                 words = tweets.get_wordcloud_words()
                 if words is None:
                     self.show_error_message("Brak tweetów do wyświetlenia dla podanych parametrów")
@@ -91,15 +119,61 @@ class Dashboard:
                     self.show_display(p)
                     print("Wordcloud displayed")
             elif funct == "interconnections_network":
+                option = self.user_stats_options[self.inter_net_option_widgets.active][1]
                 # TODO implement
                 _, q, _, _ = self.generate_test_figures()
                 self.show_display(q)
                 print("Interconnections network displayed")
             elif funct == "user_stats":
-                # TODO implement
-                _, _, r, _ = self.generate_test_figures()
-                self.show_display(r)
-                print("User stats displayed")
+                option = self.user_stats_options[self.user_stats_option_widgets.active][1]
+                labels, values = tweets.get_user_stats(option)
+                if option == UserStatsOptions.REACTIONS:
+                    figure_title = "Reakcje na tweety"
+                    r_tooltips = [
+                        ("Statystyka", "@labels"),
+                        ("Wartość", "@$name{0.00}"),
+                    ]
+                    legend_label = "Wartość"
+                    x_label_orientation = math.pi / 12
+                elif option == UserStatsOptions.TWEETS_PER_HOUR:
+                    figure_title = "Godziny publikacji"
+                    r_tooltips = [
+                        ("Godzina", "@labels"),
+                        ("Ilość tweetów", "@$name{0.00}"),
+                    ]
+                    legend_label = "Ilość tweetów"
+                    x_label_orientation = None
+                elif option == UserStatsOptions.HASHTAGS:
+                    if len(values) == 0:
+                        self.show_error_message("Znalezione tweety nie zawierają żadnych hasztagów")
+                        return
+                    figure_title = "Hasztagi"
+                    r_tooltips = [
+                        ("Hasztag", "@labels"),
+                        ("Ilość tweetów", "@$name{0.00}"),
+                    ]
+                    legend_label = "Ilość tweetów"
+                    x_label_orientation = math.pi / 12
+                else:
+                    self.show_error_message("Nierozpoznana opcja")
+                    return
+
+                data = {"labels": labels, "values": values}
+                source = ColumnDataSource(data=data)
+                y_max = max(values + [0]) * 1.2
+                x_step = 0.4
+                fig = figure(x_range=labels, y_range=(0, y_max), title=figure_title)
+
+                fig.vbar(x=dodge('labels', 0, range=fig.x_range), top='values', source=source,
+                         width=x_step, color="#e84d60", legend_label=legend_label, name='values')
+
+                fig.x_range.range_padding = x_step / 2
+                fig.xgrid.grid_line_color = None
+                fig.legend.location = "top_left"
+                if x_label_orientation is not None:
+                    fig.xaxis.major_label_orientation = x_label_orientation
+                fig.add_tools(HoverTool(tooltips=r_tooltips, formatters={'@Date': 'datetime'}))
+                self.show_display(fig)
             else:
                 raise ValueError("Należy wybrać funkcjonalność")
         except Exception as e:
@@ -132,7 +206,7 @@ class Dashboard:
         nx.set_edge_attributes(G, edge_attrs, "edge_color")
 
         q = figure(width=400, height=400, x_range=(-1.2, 1.2), y_range=(-1.2, 1.2),
-                   x_axis_location=None, y_axis_location=None, toolbar_location=None,
+                   x_axis_location=None, y_axis_location=None,
                    title="Graph Interaction Demo", background_fill_color="#efefef",
                    tooltips="index: @index, club: @club")
         q.grid.grid_line_color = None
@@ -153,21 +227,29 @@ class Dashboard:
         source = ColumnDataSource(data=data)
 
         r = figure(x_range=fruits, y_range=(0, 10), title="Fruit Counts by Year",
-                   height=350, toolbar_location=None, tools="")
+                   height=350)
 
         r.vbar(x=dodge('fruits', -0.25, range=r.x_range), top='2015', source=source,
-               width=0.2, color="#c9d9d3", legend_label="2015")
+               width=0.2, color="#c9d9d3", legend_label="2015", name='2015')
 
         r.vbar(x=dodge('fruits', 0.0, range=r.x_range), top='2016', source=source,
-               width=0.2, color="#718dbf", legend_label="2016")
+               width=0.2, color="#718dbf", legend_label="2016", name='2016')
 
         r.vbar(x=dodge('fruits', 0.25, range=r.x_range), top='2017', source=source,
-               width=0.2, color="#e84d60", legend_label="2017")
+               width=0.2, color="#e84d60", legend_label="2017", name='2017')
+
+        r_tooltips = [
+            ("Fruit", "@fruits"),
+            ("Year", "$name"),
+            ("Amount", "@$name"),
+        ]
 
         r.x_range.range_padding = 0.1
         r.xgrid.grid_line_color = None
         r.legend.location = "top_left"
         r.legend.orientation = "horizontal"
+        r.add_tools(HoverTool(tooltips=r_tooltips, formatters={'@Date': 'datetime'}))
+
         data1 = pd.read_csv("donaldtusk.csv")
         source = ColumnDataSource(data1)
 
@@ -185,8 +267,8 @@ class Dashboard:
         :return: None
         """
 
-        self.empty_element = Spacer(width=0, height=0)
-        self.plot_container = column(self.empty_element)
+        self.display_container = column(get_empty_element())
+        self.functionality_options_container = row(self.get_functionality_options())
 
         dummy_dialog = Dialog(title="Error", content="An error occurred")
         dummy_dialog.visible = False
@@ -196,13 +278,14 @@ class Dashboard:
             row(Spacer(sizing_mode="stretch_both"),
                 column(
                     Spacer(width=1, sizing_mode="stretch_height"),
-                    column(self.username, self.search_word, self.date_from, self.date_until, self.num_of_tweets,
-                           self.functionality, row(self.refresh_button, self.export_button)),
+                    column(self.username, self.search_word, self.date_from, self.date_until,
+                           self.num_of_tweets, self.functionality, self.functionality_options_container,
+                           row(self.refresh_button, self.export_button)),
                     Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
                 column(
                     Spacer(width=1, sizing_mode="stretch_height"),
-                    self.plot_container,
+                    self.display_container,
                     Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
                 self.error_dialog_container,
@@ -212,6 +295,10 @@ class Dashboard:
 
         curdoc().add_root(self.layout)
         curdoc().title = "Tweenspector"
+
+
+def get_empty_element():
+    return Spacer(width=0, height=0)
 
 
 dash = Dashboard()
