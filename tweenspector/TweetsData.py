@@ -129,6 +129,7 @@ class TweetsData:       #tworzymy obiekt klasy TweetsData, który ma wszystkie m
                         mt = mt.lower()
                         rtsmts.add(mt)
                 return rtsmts
+            # TODO https://networkx.org/grave/latest/gallery/node_picking.html
             g = igraph.Graph(directed=True)   #tworzymy graf
             rtsmts = get_friends()
             for rtmt in rtsmts:

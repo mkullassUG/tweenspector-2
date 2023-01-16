@@ -73,10 +73,10 @@ class Dashboard:
                 funct_opt.visible = True
 
         self.username = TextInput(title="Nazwa użytkownika")
-        self.search_word = TextInput(title="Poszukiwane słowo")
-        self.date_from = DatePicker(title="Data początkowa", value=date.today() - datetime.timedelta(days=30))
-        self.date_until = DatePicker(title="Data końcowa", value=date.today())
-        self.num_of_tweets = Select(title="Liczba tweetow", value='100', options=tweet_num_options)
+        self.search_word = TextInput(title="Poszukiwane słowo", height=300)
+        self.date_from = DatePicker(title="Data początkowa", value=date.today() - datetime.timedelta(days=30), height=300)
+        self.date_until = DatePicker(title="Data końcowa", value=date.today(), height=300)
+        self.num_of_tweets = Select(title="Liczba tweetow", value='100', options=tweet_num_options, height=300)
         self.functionality = Select(title="Funkcjonalność", value="wordcloud", options=functionalities)
         self.functionality_options = {
             "wordcloud": None,
@@ -296,12 +296,12 @@ class Dashboard:
         self.layout = layout(children=[
             row(Spacer(sizing_mode="stretch_both"),
                 column(
-                    Spacer(width=1, sizing_mode="stretch_height"),
+                    # Spacer(width=1, sizing_mode="stretch_height"),
                     column(self.username, self.search_word, self.date_from, self.date_until,
                            self.num_of_tweets, self.functionality,
                            row(self.functionality_option_widgets),
                            row(self.refresh_button, self.export_button)),
-                    Spacer(width=1, sizing_mode="stretch_height"),
+                    # Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
                 column(
                     Spacer(width=1, sizing_mode="stretch_height"),
