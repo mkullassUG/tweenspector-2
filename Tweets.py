@@ -231,6 +231,12 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
 
 
 def get_tweets(user_name, search_words, date_from, date_to, num_of_tweets):  # wczytanie tweetów
+    # return pd.read_csv("donaldtusk.csv",              #uncomment if dummy testing on file tweets
+    #                    converters={
+    #                        "place": lambda p: str(p),
+    #                        "hour": lambda h: str(h),
+    #                        "hashtags": lambda h: [x.strip(" '\"") for x in str(h).strip("[]").split(",")]
+    #                    })
     try:  # w przeciwnym razie konfigurujemy Twinta
         c = twint.Config()
         c.Username = user_name
