@@ -22,7 +22,7 @@ from numpy.random import randint
 import pandas as pd
 import nest_asyncio
 
-from Tweets import Tweets, UserStatsOptions
+from Tweets import Tweets, UserStatsOptions, InterconnectionsNetworkOptions
 
 nest_asyncio.apply()
 
@@ -38,7 +38,6 @@ class Dashboard:
         # global variables which can be controlled by interactive bokeh elements
         self.display_container = None
         self.error_dialog_container = None
-        self.functionality_options_container = None
         self.active_window_size = active_window_size
         self.layout = None
 
@@ -49,9 +48,10 @@ class Dashboard:
             ("user_stats", "Statystyki użytkownika")]
 
         self.inter_net_options = [
-            ("Optimal modularity", None),
-            ("Springlass", None),
-            ("Label propagation", None)
+            ("Optimal modularity", InterconnectionsNetworkOptions.OPTIMAL_MODULARITY),
+            ("Springlass", InterconnectionsNetworkOptions.SPRINGLASS),
+            ("Label propagation", InterconnectionsNetworkOptions.LABEL_PROPAGATION),
+            ("Infomap", InterconnectionsNetworkOptions.INFOMAP)
         ]
         self.user_stats_options = [
             ("Reakcje na tweety", UserStatsOptions.REACTIONS),
@@ -61,9 +61,16 @@ class Dashboard:
 
         self.inter_net_option_widgets = RadioGroup(labels=[t[0] for t in self.inter_net_options], active=0)
         self.user_stats_option_widgets = RadioGroup(labels=[t[0] for t in self.user_stats_options], active=0)
+        self.inter_net_option_widgets.visible = False
+        self.user_stats_option_widgets.visible = False
 
         def update_functionality_options(attr, old, new):
-            self.functionality_options_container.children[0] = self.get_functionality_options()
+            for w in self.functionality_option_widgets:
+                if w.visible:
+                    w.visible = False
+            funct_opt = self.functionality_options.get(self.functionality.value)
+            if funct_opt is not None:
+                funct_opt.visible = True
 
         self.username = TextInput(title="Nazwa użytkownika")
         self.search_word = TextInput(title="Poszukiwane słowo")
@@ -76,9 +83,11 @@ class Dashboard:
             "interconnections_network": self.inter_net_option_widgets,
             "user_stats": self.user_stats_option_widgets
         }
+        self.functionality_option_widgets = [self.functionality_options.get(k) for k in self.functionality_options
+                                             if self.functionality_options.get(k) is not None]
         self.functionality.on_change("value", update_functionality_options)
         self.refresh_button = Button(label="Załaduj tweety", button_type="default", width=150)
-        self.refresh_button.on_event('button_click', self.refresh)
+        self.refresh_button.on_event('button_click', self.update_display)
         self.export_button = Button(label="Zapisz do CSV", button_type="default", width=150)
         self.export_button.on_event('button_click', self.save_to_csv)
         self.export_button.disabled = True  # TODO remove once save_to_csv() is implemented
@@ -94,12 +103,18 @@ class Dashboard:
         error_dialog = Dialog(title=title, content=message)
         self.error_dialog_container.children[0] = error_dialog
 
-    def get_functionality_options(self):
-        funct_opt = self.functionality_options.get(self.functionality.value)
-        return funct_opt if funct_opt is not None else get_empty_element()
+    def update_display(self):
+        try:
+            display = self.create_display()
+            if display is not None:
+                self.show_display(display)
+            else:
+                self.hide_display()
+        except Exception as e:
+            self.hide_display()
+            raise e
 
-    def refresh(self):
-        self.hide_display()
+    def create_display(self):
         funct = self.functionality.value
         try:
             user_name = self.username.value
@@ -111,23 +126,24 @@ class Dashboard:
             if funct == "wordcloud":
                 words = tweets.get_wordcloud_words()
                 if words is None:
-                    self.show_error_message("Brak tweetów do wyświetlenia dla podanych parametrów")
+                    self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
                 else:
                     # TODO display word cloud
                     print(f"{len(words)} words to display")
                     p, _, _, _ = self.generate_test_figures()
-                    self.show_display(p)
-                    print("Wordcloud displayed")
+                    return p
             elif funct == "interconnections_network":
-                option = self.user_stats_options[self.inter_net_option_widgets.active][1]
+                option = self.inter_net_options[self.inter_net_option_widgets.active][1]
                 # TODO implement
                 _, q, _, _ = self.generate_test_figures()
-                self.show_display(q)
-                print("Interconnections network displayed")
+                return q
             elif funct == "user_stats":
                 option = self.user_stats_options[self.user_stats_option_widgets.active][1]
                 labels, values = tweets.get_user_stats(option)
                 if option == UserStatsOptions.REACTIONS:
+                    if len(values) == 0:
+                        self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
+                        return None
                     figure_title = "Reakcje na tweety"
                     r_tooltips = [
                         ("Statystyka", "@labels"),
@@ -136,6 +152,9 @@ class Dashboard:
                     legend_label = "Wartość"
                     x_label_orientation = math.pi / 12
                 elif option == UserStatsOptions.TWEETS_PER_HOUR:
+                    if len(values) == 0:
+                        self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
+                        return None
                     figure_title = "Godziny publikacji"
                     r_tooltips = [
                         ("Godzina", "@labels"),
@@ -146,17 +165,17 @@ class Dashboard:
                 elif option == UserStatsOptions.HASHTAGS:
                     if len(values) == 0:
                         self.show_error_message("Znalezione tweety nie zawierają żadnych hasztagów")
-                        return
+                        return None
                     figure_title = "Hasztagi"
                     r_tooltips = [
                         ("Hasztag", "@labels"),
-                        ("Ilość tweetów", "@$name{0.00}"),
+                        ("Ilość", "@$name{0.00}"),
                     ]
                     legend_label = "Ilość tweetów"
                     x_label_orientation = math.pi / 12
                 else:
                     self.show_error_message("Nierozpoznana opcja")
-                    return
+                    return None
 
                 data = {"labels": labels, "values": values}
                 source = ColumnDataSource(data=data)
@@ -173,9 +192,10 @@ class Dashboard:
                 if x_label_orientation is not None:
                     fig.xaxis.major_label_orientation = x_label_orientation
                 fig.add_tools(HoverTool(tooltips=r_tooltips, formatters={'@Date': 'datetime'}))
-                self.show_display(fig)
+                return fig
             else:
-                raise ValueError("Należy wybrać funkcjonalność")
+                self.show_error_message("Należy wybrać funkcjonalność")
+                return None
         except Exception as e:
             self.show_error_message(str(e))
             raise e
@@ -268,7 +288,6 @@ class Dashboard:
         """
 
         self.display_container = column(get_empty_element())
-        self.functionality_options_container = row(self.get_functionality_options())
 
         dummy_dialog = Dialog(title="Error", content="An error occurred")
         dummy_dialog.visible = False
@@ -279,7 +298,8 @@ class Dashboard:
                 column(
                     Spacer(width=1, sizing_mode="stretch_height"),
                     column(self.username, self.search_word, self.date_from, self.date_until,
-                           self.num_of_tweets, self.functionality, self.functionality_options_container,
+                           self.num_of_tweets, self.functionality,
+                           row(self.functionality_option_widgets),
                            row(self.refresh_button, self.export_button)),
                     Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
