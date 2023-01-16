@@ -59,10 +59,10 @@ class Dashboard:
             ("Hasztagi", UserStatsOptions.HASHTAGS)
         ]
 
-        self.inter_net_option_widgets = RadioGroup(labels=[t[0] for t in self.inter_net_options], active=0)
-        self.user_stats_option_widgets = RadioGroup(labels=[t[0] for t in self.user_stats_options], active=0)
-        self.inter_net_option_widgets.visible = False
-        self.user_stats_option_widgets.visible = False
+        self.inter_net_option_widgets = RadioGroup(labels=[t[0] for t in self.inter_net_options], active=0,
+                                                   visible=False)
+        self.user_stats_option_widgets = RadioGroup(labels=[t[0] for t in self.user_stats_options], active=0,
+                                                    visible=False)
 
         def update_functionality_options(attr, old, new):
             for w in self.functionality_option_widgets:
@@ -127,19 +127,29 @@ class Dashboard:
                 words = tweets.get_wordcloud_words()
                 if words is None:
                     self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
-                else:
-                    # TODO display word cloud
-                    print(f"{len(words)} words to display")
-                    p, _, _, _ = self.generate_test_figures()
-                    return p
+                    return None
+                # TODO display word cloud
+                print(f"{len(words)} words to display")
+                p, _, _, _ = self.generate_test_figures()
+                return p
             elif funct == "interconnections_network":
                 option = self.inter_net_options[self.inter_net_option_widgets.active][1]
-                # TODO implement
+                data = tweets.get_interconnections_network()
+                if data is None:
+                    self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
+                    return None
+                vertices, edges = data
+                # TODO display interconnections network graph
+                print(f"Interconnections graph: {len(vertices)} vertices, {len(edges)} edges")
                 _, q, _, _ = self.generate_test_figures()
                 return q
             elif funct == "user_stats":
                 option = self.user_stats_options[self.user_stats_option_widgets.active][1]
-                labels, values = tweets.get_user_stats(option)
+                stats = tweets.get_user_stats(option)
+                if stats is None:
+                    self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
+                    return None
+                labels, values = stats
                 if option == UserStatsOptions.REACTIONS:
                     if len(values) == 0:
                         self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
@@ -289,8 +299,7 @@ class Dashboard:
 
         self.display_container = column(get_empty_element())
 
-        dummy_dialog = Dialog(title="Error", content="An error occurred")
-        dummy_dialog.visible = False
+        dummy_dialog = Dialog(title="Error", content="An error occurred", visible=False)
         self.error_dialog_container = column(dummy_dialog)
 
         self.layout = layout(children=[

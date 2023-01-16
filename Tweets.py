@@ -71,81 +71,54 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
                   .format(excType=type(exc).__name__, excMsg=str(exc)))
             raise exc
 
-    # def get_interconnections_network(self, option):  # tu utworzenie grafu powiązań
-    #     tweets = self.get_tweets(self.user_name, self.search_words, self.Since, self.Until, self.num_of_tweets)
-    #     if tweets.empty:
-    #         return None
-    #     try:
-    #         def get_friends():  # szukamy wszystkich wspominków danego konta o innych by mieć wierzchołki grafu
-    #             rtsmts = set()
-    #             rtsmts.add(self.user_name.lower())
-    #             for r in tweets.iterrows():
-    #                 text = r[1]['tweet']
-    #                 mts = set(re.findall(r"@(\w+)", text))
-    #                 for mt in mts:
-    #                     mt = mt.lower()
-    #                     rtsmts.add(mt)
-    #             return rtsmts
-    #
-    #         g = igraph.Graph(directed=True)  # tworzymy graf
-    #         rtsmts = get_friends()
-    #         for rtmt in rtsmts:
-    #             g.add_vertex(rtmt)  # tu dodajemy wierzchołki
-    #         relations = dict()
-    #         for someone in rtsmts:
-    #             relations[someone] = dict()  # kolejno zliczamy interakcje użytkowników grafu ze sobą
-    #             friend_tweets = self.get_tweets(someone, self.search_words, self.Since, self.Until, self.num_of_tweets)
-    #             if friend_tweets.empty:  # w razie braku tweetów danego użytkownika informujemy o tym i idziemy dalej
-    #                 print("Generate interconnections network - Brak konta, user:", someone)
-    #                 continue
-    #             for r in friend_tweets.iterrows():  # zliczanie odbywa się tutaj, interakcja to wspomnienie jednego użytkownika o drugim
-    #                 text = r[1]['tweet']
-    #                 mts = set(re.findall(r"@(\w+)", text))
-    #                 for mt in mts:
-    #                     mt = mt.lower()
-    #                     if mt in rtsmts:
-    #                         if mt != someone:
-    #                             if mt in relations[someone]:
-    #                                 relations[someone][mt] = relations[someone][mt] + 1
-    #                             else:
-    #                                 relations[someone][mt] = 1
-    #
-    #         for someone in rtsmts:
-    #             temp = relations[someone]
-    #             for key, value in temp.items():  # tutaj dodajemy krawędzie do grafu, grubość krawędzi zależy od liczby interakcji między dwoma kontami
-    #                 g.add_edge(someone, key)
-    #         x = 1000 * math.log(len(rtsmts))  # tu ustawiamy rozdzielczość
-    #         y = 600 * math.log(len(rtsmts))
-    #         visual_style = {  # tu ustawiamy jak graf ma wyglądać
-    #             "vertex_size": 40,
-    #             "vertex_label_size": 50,
-    #             "vertex_label_dist": 2,
-    #             "margin": 250,
-    #             "bbox": (x, y),
-    #             "vertex_label": rtsmts,
-    #             "edge_width":
-    #                 [math.log(2 * relations[g.vs[edge.source]["name"]][g.vs[edge.target]["name"]], 1.5)
-    #                  for edge in g.es]
-    #         }
-    #         if option == InterconnectionsNetworkOptions.OPTIMAL_MODULARITY:  # tutaj jest obsługa wyboru metody grupowania kont
-    #             comm = g.community_optimal_modularity()
-    #         elif option == InterconnectionsNetworkOptions.SPRINGLASS:
-    #             comm = g.community_spinglass()
-    #         elif option == InterconnectionsNetworkOptions.LABEL_PROPAGATION:
-    #             comm = g.community_label_propagation()
-    #         elif option == InterconnectionsNetworkOptions.INFOMAP:
-    #             comm = g.community_infomap()
-    #         else:
-    #             return None
-    #         igraph.plot(comm, "images/file.png", **visual_style, mark_groups=True)  # graf można zapisać do pliku
-    #         return g
-    #     except ValueError:
-    #         print("Generate interconnections network - Blad wartosci")  # obsługa wyjątków
-    #         return None
-    #     except Exception as exc:
-    #         print("Generate interconnections network - Cos poszlo nie tak: {excType} {excMsg}"
-    #               .format(excType=type(exc).__name__, excMsg=str(exc)))
-    #         return None
+    def get_interconnections_network(self):  # tu utworzenie grafu powiązań
+        tweets = get_tweets(self.user_name, self.search_words, self.Since, self.Until, self.num_of_tweets)
+        if tweets.empty:
+            return None
+
+        people = set()
+        people.add(self.user_name.lower())
+        for r in tweets.iterrows():
+            text = r[1]['tweet']
+            mts = set(re.findall(r"@(\w+)", text))
+            for mt in mts:
+                mt = mt.lower()
+                people.add(mt)
+
+        relations = dict()
+        for someone in people:
+            relations[someone] = dict()  # kolejno zliczamy interakcje użytkowników grafu ze sobą
+            friend_tweets = get_tweets(someone, self.search_words, self.Since, self.Until, self.num_of_tweets)
+            if friend_tweets.empty:  # w razie braku tweetów danego użytkownika informujemy o tym i idziemy dalej
+                print("Generate interconnections network - Brak konta, user:", someone)
+                continue
+            for r in friend_tweets.iterrows():  # zliczanie odbywa się tutaj, interakcja to wspomnienie jednego użytkownika o drugim
+                text = r[1]['tweet']
+                mts = set(re.findall(r"@(\w+)", text))
+                for mt in mts:
+                    mt = mt.lower()
+                    if mt in people:
+                        if mt != someone:
+                            if mt in relations[someone]:
+                                relations[someone][mt] = relations[someone][mt] + 1
+                            else:
+                                relations[someone][mt] = 1
+
+        #     x = 1000 * math.log(len(people))
+        #     y = 600 * math.log(len(people))
+        #     visual_style = {
+        #         "vertex_size": 40,
+        #         "vertex_label_size": 50,
+        #         "vertex_label_dist": 2,
+        #         "margin": 250,
+        #         "bbox": (x, y),
+        #         "vertex_label": people,
+        #         "edge_width":
+        #             [math.log(2 * relations[g.vs[edge.source]["name"]][g.vs[edge.target]["name"]], 1.5)
+        #              for edge in g.es]
+        #     }
+
+        return people, relations  # vertices, edges
 
     def get_user_stats(self, option: UserStatsOptions):  # tu obliczmy statystyki konta
         def generate_account_info(df):
