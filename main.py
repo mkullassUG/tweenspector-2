@@ -2,10 +2,11 @@ import datetime
 import math
 from datetime import date
 
+import networkx
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row, Spacer
 from bokeh.models import Select, DatePicker, TextInput, Button, TableColumn, DataTable, CrosshairTool, HoverTool, \
-    SaveTool, RadioGroup
+    SaveTool, RadioGroup, Range1d, NodesAndLinkedEdges, EdgesAndLinkedNodes, TapTool, BoxSelectTool
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.ui import Dialog
 
@@ -74,7 +75,8 @@ class Dashboard:
 
         self.username = TextInput(title="Nazwa użytkownika")
         self.search_word = TextInput(title="Poszukiwane słowo", height=300)
-        self.date_from = DatePicker(title="Data początkowa", value=date.today() - datetime.timedelta(days=30), height=300)
+        self.date_from = DatePicker(title="Data początkowa", value=date.today() - datetime.timedelta(days=30),
+                                    height=300)
         self.date_until = DatePicker(title="Data końcowa", value=date.today(), height=300)
         self.num_of_tweets = Select(title="Liczba tweetow", value='100', options=tweet_num_options, height=300)
         self.functionality = Select(title="Funkcjonalność", value="wordcloud", options=functionalities)
@@ -215,6 +217,33 @@ class Dashboard:
         pass
 
     def generate_test_figures(self):
+
+        # G = networkx.from_pandas_edgelist(got_df, 'Source', 'Target', 'Weight')
+        #
+        # title = 'Game of Thrones Network'
+        #
+        # # Establish which categories will appear when hovering over each node
+        # HOVER_TOOLTIPS = [("Character", "@index")]
+        #
+        # # Create a plot — set dimensions, toolbar, and title
+        # plot = figure(tooltips=HOVER_TOOLTIPS,
+        #               tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
+        #               x_range=Range1d(-10.1, 10.1), y_range=Range1d(-10.1, 10.1), title=title)
+        #
+        # # Create a network graph object with spring layout
+        # # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.layout.spring_layout.html
+        # network_graph = from_networkx(G, networkx.spring_layout, scale=10, center=(0, 0))
+        #
+        # # Set node size and color
+        # network_graph.node_renderer.glyph = Circle(size=15, fill_color='skyblue')
+        #
+        # # Set edge opacity and width
+        # network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.5, line_width=1)
+        #
+        # # Add network graph to the plot
+        # plot.renderers.append(network_graph)
+
+        # ------------------------------------------------------------------------------------
         x = np.linspace(0, 4 * np.pi, 100)
         y = np.sin(x)
         p = figure(title="Legend Example")
@@ -241,10 +270,22 @@ class Dashboard:
                    tooltips="index: @index, club: @club")
         q.grid.grid_line_color = None
 
+        #TODO figure out why tools don't get added
+        q.add_tools(HoverTool(tooltips=None), TapTool(), BoxSelectTool())
         graph_renderer = from_networkx(G, nx.spring_layout, scale=1, center=(0, 0))
+
         graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
+        graph_renderer.node_renderer.selection_glyph = Circle(size=15, fill_color="blue")
+        graph_renderer.node_renderer.hover_glyph = Circle(size=15, fill_color="darkblue")
+
         graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
                                                        line_alpha=0.8, line_width=1.5)
+        graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color="lightgray", line_width=5)
+        graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="darkgrey", line_width=5)
+
+        graph_renderer.selection_policy = NodesAndLinkedEdges()
+        graph_renderer.inspection_policy = EdgesAndLinkedNodes()
+
         q.renderers.append(graph_renderer)
         fruits = ['Apples', 'Pears', 'Nectarines', 'Plums', 'Grapes', 'Strawberries']
         years = ['2015', '2016', '2017']
