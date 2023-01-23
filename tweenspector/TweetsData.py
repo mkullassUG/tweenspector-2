@@ -1,5 +1,5 @@
-import twint
-from wordcloud import WordCloud
+import twint            #tutaj wszystkie importy
+from wordcloud import WordCloud, STOPWORDS
 import re
 import igraph
 import pandas as pd
