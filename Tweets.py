@@ -6,6 +6,7 @@ from enum import auto
 import pandas as pd
 import spacy
 import twint
+from wordcloud import WordCloud
 
 from tweenspector.App_variables import timezone_to_string
 
@@ -32,15 +33,15 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
         self.Until = date_to
         self.search_words = search_words
 
-    def get_wordcloud_words(self):
+    def get_wordcloud(self, font_path=None, color_function=None):
         tweets = get_tweets(self.user_name, self.search_words, self.Since, self.Until, self.num_of_tweets)
         if tweets.empty:  # wczytujemy tweety, jeśli brak tweetów to wychodzimy
             return None
         try:
-            words = []
-            lemmatizer_enabled = True  # włączamy lematyzer
-            preprocessed_tweets_text = ''  # tu tekst tweetów po przetworzeniu
+            words = {}
             nlp = spacy.load("pl_core_news_lg")
+            stopwords = nlp.Defaults.stop_words
+            stopwords.update(["RT", ".", ",", " ", "!", "?", ":", "-", "\"", "$"])
             # tutaj kolejno szukamy wspominków o innych kontach by dodać je do słów nieznaczących
             for tweet in tweets.iterrows():
                 text = tweet[1]['tweet']
@@ -52,17 +53,26 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
                 lst = re.findall(r"(@\w+)", text)
                 for i in lst:
                     text = text.replace(i, '')
-                if lemmatizer_enabled:  # tutaj lematyzacja słów
-                    stopwords = nlp.Defaults.stop_words
-                    stopwords.add("RT")
-                    tweets_text_from_lemmatizer = nlp(str(text))  # kolejno lematyzujemy wszystkie słowa
-                    for t in tweets_text_from_lemmatizer:  # do tekstu do przetworzenia dodajemy tylko słowa znaczące
-                        if t.lemma_ not in stopwords:
-                            words.append(html.unescape(t.lemma_))
-                else:
-                    # gdyby lematyzer był wyłączony to w tekście wszystkie słowa
-                    words = tweets.tweet.values
-            return words
+                tweets_text_from_lemmatizer = nlp(str(text))  # kolejno lematyzujemy wszystkie słowa
+                for t in tweets_text_from_lemmatizer:  # do tekstu do przetworzenia dodajemy tylko słowa znaczące
+                    word = html.unescape(t.lemma_)
+                    if t.lemma_ not in stopwords and word not in stopwords:
+                        if word in words:
+                            words[word] = words.get(word) + 1
+                        else:
+                            words[word] = 1
+
+            wordcloud = WordCloud(
+                background_color='black',
+                colormap='Pastel1',
+                width=1000,
+                height=500,
+                stopwords=stopwords,
+                regexp=r"\w[\w'\&\-]*\w",
+                font_path=font_path,
+                color_func=color_function)
+            ret = wordcloud.fit_words(words).layout_
+            return words, ret
         except ValueError as exc:  # obsługa wyjątków
             print("Generate word cloud - Blad wartosci")
             raise exc
@@ -232,6 +242,12 @@ class Tweets:  # tworzymy obiekt klasy Tweets, który ma wszystkie metody potrze
 
 def get_tweets(user_name, search_words, date_from, date_to, num_of_tweets):  # wczytanie tweetów
     # return pd.read_csv("donaldtusk.csv",              #uncomment if dummy testing on file tweets
+    #                    converters={
+    #                        "place": lambda p: str(p),
+    #                        "hour": lambda h: str(h),
+    #                        "hashtags": lambda h: [x.strip(" '\"") for x in str(h).strip("[]").split(",")]
+    #                    })
+    # return pd.read_csv("donaldtusk.csv",
     #                    converters={
     #                        "place": lambda p: str(p),
     #                        "hour": lambda h: str(h),

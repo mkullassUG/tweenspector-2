@@ -1,13 +1,17 @@
 import datetime
 import math
+import os
 from datetime import date
+from random import Random
 
+from bokeh.core.property.vectorization import Value
 import networkx
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout, row, Spacer
 from bokeh.models import Select, DatePicker, TextInput, Button, TableColumn, DataTable, CrosshairTool, HoverTool, \
-    SaveTool, RadioGroup, Range1d, NodesAndLinkedEdges, EdgesAndLinkedNodes, TapTool, BoxSelectTool
+    SaveTool, RadioGroup, Plot, Text, Label
 from bokeh.models.callbacks import CustomJS
+from bokeh.models.glyph import TextGlyph
 from bokeh.models.ui import Dialog
 
 import numpy as np
@@ -126,14 +130,59 @@ class Dashboard:
             tweets_count = self.num_of_tweets.value
             tweets = Tweets(user_name, search_words, date_from, date_to, tweets_count)
             if funct == "wordcloud":
-                words = tweets.get_wordcloud_words()
-                if words is None:
+                font_path = "Helvetica.ttf"
+                def color_function(word, font_size, position, orientation, random_state, font_path):
+                    if random_state is None:
+                        random_state = Random()
+                    return f"hsl({random_state.randint(0, 360)}, 80%, 60%)"
+
+                if os.path.exists(font_path):
+                    try:
+                        wordcloud_data = tweets.get_wordcloud(font_path=font_path, color_function=color_function)
+                    except OSError:
+                        self.show_error_message("Wystąpił błąd przy wczytywaniu czcionki. "
+                                                "Chmura słów może zawierać błędy.")
+                        wordcloud_data = tweets.get_wordcloud(color_function=color_function)
+                else:
+                    self.show_error_message("Nie znaleziono odpowiedniej czcionki. Chmura słów może zawierać błędy.")
+                    wordcloud_data = tweets.get_wordcloud(color_function=color_function)
+                if wordcloud_data is None:
                     self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
                     return None
-                # TODO display word cloud
-                print(f"{len(words)} words to display")
-                p, _, _, _ = self.generate_test_figures()
-                return p
+
+                word_freq, wordcloud = wordcloud_data
+
+                max_text_size = max(v[1] for v in wordcloud)
+                text_size_ratio = 130
+
+                hover_tooltips = [
+                    ("Tekst", "@text"),
+                    ("Ilość", "@freq")
+                ]
+
+                x = [v[2][1] for v in wordcloud]
+                y = [-v[2][0] for v in wordcloud]
+                text = [v[0][0] for v in wordcloud]
+                text_size = [f"{float(v[1]) / max_text_size * text_size_ratio}px" for v in wordcloud]
+                angle = [0 if v[3] is None else math.pi / 2 for v in wordcloud]
+                color = [v[4] for v in wordcloud]
+                freq = [word_freq.get(v[0][0]) for v in wordcloud]
+
+                text_baseline = ["top" for v in wordcloud] # if v[3] is None else "bottom"
+                text_align = ["left" if v[3] is None else "right" for v in wordcloud]
+
+                print(f"({x[0]}, {y[0]}), {text[0]}, {text_size[0]}, {angle[0]}, {color[0]}")
+
+                source = ColumnDataSource(dict(x=x, y=y, text=text, text_size=text_size, angle=angle, color=color,
+                                               text_baseline=text_baseline, text_align=text_align,
+                                               freq=freq))
+
+                fig = figure(title="Chmura słów", match_aspect=True)
+                glyph = Text(x="x", y="y", text="text", angle="angle", text_font_size="text_size", text_color="color",
+                             text_baseline="text_baseline", text_align="text_align")
+                fig.add_glyph(source, glyph)
+                fig.add_tools(HoverTool(tooltips=hover_tooltips, formatters={'@Date': 'datetime'}))
+                return fig
             elif funct == "interconnections_network":
                 option = self.inter_net_options[self.inter_net_option_widgets.active][1]
                 data = tweets.get_interconnections_network()
@@ -157,7 +206,7 @@ class Dashboard:
                         self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
                         return None
                     figure_title = "Reakcje na tweety"
-                    r_tooltips = [
+                    hover_tooltips = [
                         ("Statystyka", "@labels"),
                         ("Wartość", "@$name{0.00}"),
                     ]
@@ -168,7 +217,7 @@ class Dashboard:
                         self.show_error_message("Nie znaleziono żadnych tweetów dla podanych parametrów")
                         return None
                     figure_title = "Godziny publikacji"
-                    r_tooltips = [
+                    hover_tooltips = [
                         ("Godzina", "@labels"),
                         ("Ilość tweetów", "@$name{0.00}"),
                     ]
@@ -179,7 +228,7 @@ class Dashboard:
                         self.show_error_message("Znalezione tweety nie zawierają żadnych hasztagów")
                         return None
                     figure_title = "Hasztagi"
-                    r_tooltips = [
+                    hover_tooltips = [
                         ("Hasztag", "@labels"),
                         ("Ilość", "@$name{0.00}"),
                     ]
@@ -203,7 +252,7 @@ class Dashboard:
                 fig.legend.location = "top_left"
                 if x_label_orientation is not None:
                     fig.xaxis.major_label_orientation = x_label_orientation
-                fig.add_tools(HoverTool(tooltips=r_tooltips, formatters={'@Date': 'datetime'}))
+                fig.add_tools(HoverTool(tooltips=hover_tooltips, formatters={'@Date': 'datetime'}))
                 return fig
             else:
                 self.show_error_message("Należy wybrać funkcjonalność")
@@ -217,33 +266,6 @@ class Dashboard:
         pass
 
     def generate_test_figures(self):
-
-        # G = networkx.from_pandas_edgelist(got_df, 'Source', 'Target', 'Weight')
-        #
-        # title = 'Game of Thrones Network'
-        #
-        # # Establish which categories will appear when hovering over each node
-        # HOVER_TOOLTIPS = [("Character", "@index")]
-        #
-        # # Create a plot — set dimensions, toolbar, and title
-        # plot = figure(tooltips=HOVER_TOOLTIPS,
-        #               tools="pan,wheel_zoom,save,reset", active_scroll='wheel_zoom',
-        #               x_range=Range1d(-10.1, 10.1), y_range=Range1d(-10.1, 10.1), title=title)
-        #
-        # # Create a network graph object with spring layout
-        # # https://networkx.github.io/documentation/networkx-1.9/reference/generated/networkx.drawing.layout.spring_layout.html
-        # network_graph = from_networkx(G, networkx.spring_layout, scale=10, center=(0, 0))
-        #
-        # # Set node size and color
-        # network_graph.node_renderer.glyph = Circle(size=15, fill_color='skyblue')
-        #
-        # # Set edge opacity and width
-        # network_graph.edge_renderer.glyph = MultiLine(line_alpha=0.5, line_width=1)
-        #
-        # # Add network graph to the plot
-        # plot.renderers.append(network_graph)
-
-        # ------------------------------------------------------------------------------------
         x = np.linspace(0, 4 * np.pi, 100)
         y = np.sin(x)
         p = figure(title="Legend Example")
@@ -270,22 +292,10 @@ class Dashboard:
                    tooltips="index: @index, club: @club")
         q.grid.grid_line_color = None
 
-        #TODO figure out why tools don't get added
-        q.add_tools(HoverTool(tooltips=None), TapTool(), BoxSelectTool())
         graph_renderer = from_networkx(G, nx.spring_layout, scale=1, center=(0, 0))
-
         graph_renderer.node_renderer.glyph = Circle(size=15, fill_color="lightblue")
-        graph_renderer.node_renderer.selection_glyph = Circle(size=15, fill_color="blue")
-        graph_renderer.node_renderer.hover_glyph = Circle(size=15, fill_color="darkblue")
-
         graph_renderer.edge_renderer.glyph = MultiLine(line_color="edge_color",
                                                        line_alpha=0.8, line_width=1.5)
-        graph_renderer.edge_renderer.selection_glyph = MultiLine(line_color="lightgray", line_width=5)
-        graph_renderer.edge_renderer.hover_glyph = MultiLine(line_color="darkgrey", line_width=5)
-
-        graph_renderer.selection_policy = NodesAndLinkedEdges()
-        graph_renderer.inspection_policy = EdgesAndLinkedNodes()
-
         q.renderers.append(graph_renderer)
         fruits = ['Apples', 'Pears', 'Nectarines', 'Plums', 'Grapes', 'Strawberries']
         years = ['2015', '2016', '2017']
@@ -346,12 +356,12 @@ class Dashboard:
         self.layout = layout(children=[
             row(Spacer(sizing_mode="stretch_both"),
                 column(
-                    # Spacer(width=1, sizing_mode="stretch_height"),
+                    Spacer(width=1, sizing_mode="stretch_height"),
                     column(self.username, self.search_word, self.date_from, self.date_until,
                            self.num_of_tweets, self.functionality,
                            row(self.functionality_option_widgets),
                            row(self.refresh_button, self.export_button)),
-                    # Spacer(width=1, sizing_mode="stretch_height"),
+                    Spacer(width=1, sizing_mode="stretch_height"),
                     sizing_mode="stretch_height"),
                 column(
                     Spacer(width=1, sizing_mode="stretch_height"),
